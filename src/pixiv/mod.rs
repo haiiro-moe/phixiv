@@ -208,10 +208,29 @@ async fn cached_get_listing(
     let path = url::Url::parse(&image_url)?.path().to_string();
     let thumbnail_type = env::var("THUMBNAIL_TYPE").ok();
 
+    // IMAGE_PROXY_BASES: comma-separated external image proxies. When set,
+    // embed image URLs point at the first proxy instead of this instance's
+    // /i/ route, so clients fetch images from a proxy that can reach
+    // i.pximg.net (e.g. when this server's IP is blocked by pixiv CDN).
+    let image_proxy_bases: Vec<String> = env::var("IMAGE_PROXY_BASES")
+        .map(|v| {
+            v.split(',')
+                .map(|s| s.trim().trim_end_matches('/').to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+    let image_url_prefix = |p: String| -> String {
+        match image_proxy_bases.first() {
+            Some(base) => format!("{}/{}", base, p.trim_start_matches('/')),
+            None => format!("https://{}/i{}", host, p),
+        }
+    };
+
     let image_proxy_urls = if is_ugoira && ugoira_enabled {
         vec![
             format!("https://{}/i/ugoira/{}.mp4", host, clean_illust_id),
-            format!("https://{}/i{}", host, path),
+            image_url_prefix(path),
         ]
     } else {
         (0..ajax_response.body.page_count)
@@ -224,7 +243,7 @@ async fn cached_get_listing(
                 if let Some(replacement) = &thumbnail_type {
                     current_path = current_path.replace("img-master", replacement);
                 }
-                format!("https://{}/i{}", host, current_path)
+                image_url_prefix(current_path)
             })
             .collect::<Vec<String>>()
     };
