@@ -1,5 +1,7 @@
 use std::{env, sync::Arc, time::Duration};
 
+use http::HeaderMap;
+
 use axum::{
     body::StreamBody,
     extract::{Path, State},
@@ -40,23 +42,40 @@ async fn proxy_handler(
     let path_tail = format!("{path_first}/{path_rest}");
 
     let mut response = None;
+    let mut failures: Vec<String> = Vec::new();
     for base in &bases {
         let url = format!("{base}/{path_tail}");
-        let mut headers = helper::headers();
-        // External pximg proxy mirrors don't need (and some reject) the pixiv Referer.
-        if base.contains("pximg.net") {
-            headers.append("Referer", "https://www.pixiv.net/".parse()?);
-        }
-        match state.client.get(&url).headers(headers.clone()).send().await {
+        // pixiv's CDN needs the app-style headers + Referer; third-party mirror
+        // proxies are often behind Cloudflare, which challenges non-browser
+        // UAs from datacenter IPs — use a plain browser UA for them.
+        let headers = if base.contains("pximg.net") {
+            let mut h = helper::headers();
+            h.append("Referer", "https://www.pixiv.net/".parse()?);
+            h
+        } else {
+            let mut h = HeaderMap::new();
+            h.append(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
+                 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+                    .split_whitespace()
+                    .collect::<Vec<&str>>()
+                    .join(" ")
+                    .parse()?,
+            );
+            h
+        };
+        match state.client.get(&url).headers(headers).send().await {
             Ok(r) if r.status().is_success() || r.status().as_u16() == 404 => {
                 response = Some(r);
                 break;
             }
-            _ => continue,
+            Ok(r) => failures.push(format!("{base}: {}", r.status())),
+            Err(e) => failures.push(format!("{base}: {e}")),
         }
     }
     let response = response.ok_or_else(|| {
-        anyhow::anyhow!("all image upstream proxies failed for /{path_tail}")
+        anyhow::anyhow!("all image upstream proxies failed for /{path_tail} ({})", failures.join(", "))
     })?;
 
     let status = response.status();
