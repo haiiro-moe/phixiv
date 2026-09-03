@@ -6,3 +6,5 @@ commands.txt
 .vscode
 
 *.service
+
+.DS_Store
