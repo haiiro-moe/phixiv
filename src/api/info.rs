@@ -18,7 +18,7 @@ pub(super) async fn artwork_info_handler(
     Query(path): Query<ArtworkInfoPath>,
 ) -> Result<Json<APIResponse>, PhixivError> {
     let message = format!(
-        "The phixiv API is no longer available, you can call the Pixiv API directly, it has the same information. Example: https://www.pixiv.net/ajax/illust/{}?lang={}",
+        "This service's API is no longer available, you can call the Pixiv API directly, it has the same information. Example: https://www.pixiv.net/ajax/illust/{}?lang={}",
         path.id,
         path.language.unwrap_or_else(|| "jp".to_string())
     );

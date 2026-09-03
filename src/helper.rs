@@ -17,12 +17,12 @@ pub fn headers() -> HeaderMap<HeaderValue> {
 }
 
 pub fn provider_name() -> String {
-    env::var("PROVIDER_NAME").unwrap_or_else(|_| String::from("phixiv"))
+    env::var("PROVIDER_NAME").unwrap_or_else(|_| String::from("Gakkou Pixiv Club"))
 }
 
 pub fn provider_url() -> String {
     env::var("PROVIDER_URL")
-        .unwrap_or_else(|_| String::from("https://github.com/HazelTheWitch/phixiv"))
+        .unwrap_or_else(|_| String::from("https://github.com/haiiro-moe/phixiv"))
 }
 
 pub struct PhixivError(anyhow::Error);
