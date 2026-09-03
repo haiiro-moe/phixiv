@@ -29,8 +29,22 @@ async fn proxy_handler(
 
     let response = state.client.get(&url).headers(headers).send().await?;
 
+    let status = response.status();
+    let content_type = response
+        .headers()
+        .get(http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // Forward upstream Content-Type; Discord rejects embed images without it.
+    let mut header_map = http::HeaderMap::new();
+    if let Some(ct) = content_type.and_then(|ct| ct.parse().ok()) {
+        header_map.insert(http::header::CONTENT_TYPE, ct);
+    }
+
     Ok((
-        response.status(),
+        status,
+        header_map,
         TypedHeader(
             CacheControl::new()
                 .with_max_age(Duration::from_secs(60 * 60 * 24))
